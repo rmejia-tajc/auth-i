@@ -4,9 +4,11 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 
 const session = require('express-session'); // Sessions 1. import it
+const knexSessionStore = require('connect-session-knex')(session);
 
+// knexSessionStore(session);  <- same as above
 
-
+const db = require('./dbConfig.js');
 const UsersDB = require('./usersHelpers.js');
 
 
@@ -24,7 +26,7 @@ const sessionConfig = {
     resave: false,
     saveUninitialized: false, // laws against setting cookies automatically
 
-
+    
 };
 
 server.use(helmet());
@@ -56,23 +58,33 @@ server.post('/api/login', (req, res) => {
     let { username, password } = req.body;
   
     UsersDB.findBy({ username })
-      .first()
-      .then(user => {
-        // check that passwords match
-        if (user && bcrypt.compareSync(password, user.password)) {
-            res.session.user = user; // Sessions 4. add this
-          res.status(200).json({ message: `Welcome ${user.username}, you get a cookie!` });
-        } else {
-          res.status(401).json({ message: 'You Shall Not Pass!' });
-        }
-      })
-      .catch(error => {
-        res.status(500).json(error);
-      });
+        .first()
+        .then(user => {
+            // check that passwords match
+            if (user && bcrypt.compareSync(password, user.password)) {
+                req.session.user = user; // Sessions 4. add this
+                res.status(200).json({ message: `Welcome ${user.username}, you are logged in!` });
+            } else {
+                res.status(401).json({ message: 'You Shall Not Pass!' });
+            }
+        })
+        .catch(error => {
+            res.status(500).json(error);
+        });
   });
 
 
-server.get('/api/users', async (req, res) => {
+function restricted(req, res, next) {
+
+    if (req.session && req.session.user) {
+        next();
+    } else {
+        res.status(401).json({ message: 'You are not logged in. You shall not pass!'});
+    }
+};
+
+
+server.get('/api/users', restricted, async (req, res) => {
     try {
       const users = await UsersDB.find();
   
