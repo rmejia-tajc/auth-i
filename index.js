@@ -3,6 +3,8 @@ const helmet = require('helmet');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 
+const session = require('express-session'); // Sessions 1. import it
+
 
 
 const UsersDB = require('./usersHelpers.js');
@@ -10,9 +12,25 @@ const UsersDB = require('./usersHelpers.js');
 
 const server = express();
 
+// Sessions 3. configure it here
+const sessionConfig = {
+    name: 'banana', // to change from the default name of 'sid'
+    secret: 'This can be literally be anything! So make it a bit long for security', // have this on .env file for production
+    cookie: {
+        maxAge: 1000 * 60 * 15, // session length in milliseconds (this is for 15 mins)
+        secure: false, // used over https only if true
+    },
+    httpOnly: true, // the user can't access the cookie from js using document.cookie if true
+    resave: false,
+    saveUninitialized: false, // laws against setting cookies automatically
+
+
+};
+
 server.use(helmet());
 server.use(express.json());
 server.use(cors());
+server.use(session(sessionConfig)); // Sessions 2. let the server use it
 
 
 server.post('/api/register', (req, res) => {
@@ -42,7 +60,8 @@ server.post('/api/login', (req, res) => {
       .then(user => {
         // check that passwords match
         if (user && bcrypt.compareSync(password, user.password)) {
-          res.status(200).json({ message: `Welcome ${user.username}!` });
+            res.session.user = user; // Sessions 4. add this
+          res.status(200).json({ message: `Welcome ${user.username}, you get a cookie!` });
         } else {
           res.status(401).json({ message: 'You Shall Not Pass!' });
         }
