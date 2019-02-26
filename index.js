@@ -4,9 +4,8 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 
 const session = require('express-session'); // Sessions 1. import it
-const knexSessionStore = require('connect-session-knex')(session);
-
-// knexSessionStore(session);  <- same as above
+const knexSessionStore = require('connect-session-knex')(session); // import and configure (this will keep sessions stored even if server resets)
+// knexSessionStore(session);  <- same as above with out currying
 
 const db = require('./dbConfig.js');
 const UsersDB = require('./usersHelpers.js');
@@ -26,11 +25,11 @@ const sessionConfig = {
     resave: false,
     saveUninitialized: false, // laws against setting cookies automatically
 
-    store: new knexSessionStore({
+    store: new knexSessionStore({ // configure connect-session-knex
         knex: db,
+        createtable: true, // adding this will give you the following bellow by default (clearInterval will be 60000 / 1 min - probably too short!)
         tablename: 'sessions',
         sidfieldname: 'sid',
-        createtable: true,
         clearInterval: 1000 * 60 * 60, // clear expired sessions (in milliseconds)
     }),
 };
@@ -46,12 +45,13 @@ server.post('/api/register', (req, res) => {
     let user = req.body;
 
     //generate hash from password
-    const hash = bcrypt.hashSync(user.password, 15); // 2^n (rehashes)
+    const hash = bcrypt.hashSync(user.password, 14); // 2^n (rehashes)
     //override user.password with generated hash
     user.password = hash;
 
     UsersDB.add (user)
         .then(saved => {
+            req.session.user = saved; // add this to make user logged in after registering
             res.status(201).json(saved);
         })
         .catch(error => {
@@ -80,7 +80,7 @@ server.post('/api/login', (req, res) => {
   });
 
 
-function restricted(req, res, next) {
+function restricted(req, res, next) { // restricted function to limit access to GET users from '/api/users' call from below
 
     if (req.session && req.session.user) {
         next();
