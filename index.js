@@ -26,7 +26,13 @@ const sessionConfig = {
     resave: false,
     saveUninitialized: false, // laws against setting cookies automatically
 
-    
+    store: new knexSessionStore({
+        knex: db,
+        tablename: 'sessions',
+        sidfieldname: 'sid',
+        createtable: true,
+        clearInterval: 1000 * 60 * 60, // clear expired sessions (in milliseconds)
+    }),
 };
 
 server.use(helmet());
